@@ -27,8 +27,13 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_log.h"
 #include "esp_system.h"
 #include "nvs_flash.h"
+
+#ifdef CONFIG_PPP_SUPPORT
+#include "at_pppd.h"
+#endif
 
 #ifdef CONFIG_AT_WIFI_COMMAND_SUPPORT
 #include "esp_event_loop.h"
@@ -208,7 +213,9 @@ void app_main()
 #endif
 
     nvs_flash_init();
+    // TCP/IP Adapter Migration see https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/tcpip_adapter_migration.html
     tcpip_adapter_init();
+    //esp_netif_init(); //called already in wifi_init();
 #ifdef CONFIG_AT_WIFI_COMMAND_SUPPORT
     initialise_wifi();
 #endif
@@ -230,6 +237,26 @@ void app_main()
         printf("regist base cmd fail\r\n");
     }
 #endif
+
+/**
+ * Anfang
+ **/
+
+#ifdef CONFIG_PPP_SUPPORT
+    if (esp_at_pppd_cmd_regist() == false)
+    {
+        printf("regist pppd cmd fail\r\n");
+    }
+    else
+    {
+        ESP_LOGI(TAG, "esp_at_pppd_cmd_regist success");    
+    }
+
+#endif
+
+/**
+ * Ende
+ **/
 
 #ifdef CONFIG_AT_WIFI_COMMAND_SUPPORT
     if(esp_at_wifi_cmd_regist() == false) {
