@@ -59,6 +59,8 @@
 #include "at_interface.h"
 #include "at_default_config.h"
 
+static const char *TAG = "main";
+
 #ifdef CONFIG_AT_ETHERNET_SUPPORT
 #include "at_eth_init.h"
 #endif

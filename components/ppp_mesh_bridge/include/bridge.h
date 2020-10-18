@@ -5,7 +5,10 @@
 
 
 
-u8_t raw_recv_fn_cb(void *arg, struct raw_pcb *pcb, struct pbuf *p, const ip_addr_t *addr);
+
+signed char input_cb(struct pbuf *p, struct netif *inp);
+
+void test();
 
 
 

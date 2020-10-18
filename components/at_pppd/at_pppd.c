@@ -51,14 +51,11 @@
 
 #include "bridge.h"
 
-
 #ifndef CONFIG_AT_UART_PORT
 #define CONFIG_AT_UART_PORT UART_NUM_1
 #endif
 
 #ifdef CONFIG_PPP_SUPPORT
-
-
 
 #define BUF_SIZE (1024)
 #define MAX_IP_LEN (15)
@@ -210,8 +207,6 @@ static void ppp_status_cb(ppp_pcb *pcb, int err_code, void *ctx)
     struct netif *pppif = ppp_netif(pcb);
     LWIP_UNUSED_ARG(ctx);
 
-    ESP_LOGI(TAG, "PPP status callback\r\nerr_code: %i\r\n", err_code);
-
     switch (err_code)
     {
     case PPPERR_NONE:
@@ -226,6 +221,9 @@ static void ppp_status_cb(ppp_pcb *pcb, int err_code, void *ctx)
 #if PPP_IPV6_SUPPORT
         ESP_LOGI(TAG, "   our6_ipaddr = %s\n", ip6addr_ntoa(netif_ip6_addr(pppif, 0)));
 #endif /* PPP_IPV6_SUPPORT */
+
+        pppif->input = *input_cb;
+        test();
         break;
     }
     case PPPERR_PARAM:
@@ -302,7 +300,6 @@ static void ppp_status_cb(ppp_pcb *pcb, int err_code, void *ctx)
 
     if (err_code == PPPERR_NONE)
     {
-        raw_recv(pcb, raw_recv_fn_cb, (void *)0);
         return;
     }
     else
@@ -404,8 +401,11 @@ uint8_t at_exeCmdPpp(uint8_t *cmd_name)
     dbg_lwip_tcp_pcb_show();
 
     /**
-     * Hier Task zum senden von Paketen initialisieren
-     **/
+ * Callback fn
+ **/
+    //raw_recv(*ppp, raw_recv_fn_cb, (void *)0);
+    ppp->netif->input = *input_cb;
+    ppp_netif.input = *input_cb;
 
     while (keep_running)
     {
@@ -414,6 +414,7 @@ uint8_t at_exeCmdPpp(uint8_t *cmd_name)
 
         if ((len == 3) && (memcmp(data, PPP_MOD_ESC, 3) == 0))
         {
+            sprintf("%s", data);
             // "+++" input escapes and returns to AT terminal control.
             // You can't type this fast enough. A terminal macro works well though.
             ESP_LOGI(TAG, "Received \"%s\", closing PPP and escaping.", PPP_MOD_ESC);

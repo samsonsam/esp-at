@@ -3,15 +3,20 @@
 #include <string.h>
 
 #include "esp_log.h"
-
-#include "lwip/raw.h"
+#include "lwip/netif.h"
 
 static const char *TAG = "bridge";
 
 
-u8_t raw_recv_fn_cb(void *arg, struct raw_pcb *pcb, struct pbuf *p, const ip_addr_t *addr)
+signed char input_cb(struct pbuf *p, struct netif *inp)
 {
     ESP_LOGI(TAG, "bridge_cb");
     sprintf("%s", p->payload);
-    return 0;
+    pbuf_free(p);
+    return 1;
+}
+
+void test()
+{
+    ESP_LOGI(TAG, "test");
 }
