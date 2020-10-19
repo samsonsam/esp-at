@@ -11,7 +11,4 @@ signed char input_cb(struct pbuf *p, struct netif *inp);
 void test();
 
 
-
-
-
 #endif //__BRIDGE_H__

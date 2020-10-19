@@ -294,3 +294,13 @@ config ESP_AT_FW_VERSION
       The maximum length of the string is 128 characters.
       If more than 128 characters, it will be invalid.
 endmenu
+
+
+menu "ESP-Mesh"
+
+config ESP_MESH_FORWARD
+    bool "Enable forwarding packets received on PPP interface via ESP-Mesh"
+    default "n"
+    #depends on AT_ENABLE && BT_ENABLED
+
+endmenu

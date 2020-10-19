@@ -4,14 +4,46 @@
 
 #include "esp_log.h"
 #include "lwip/netif.h"
+#include "lwip/ip4.h"
 
 static const char *TAG = "bridge";
 
+#define IP_PROTO_ICMP 1
+#define IP_PROTO_IGMP 2
+#define IP_PROTO_UDP 17
+#define IP_PROTO_UDPLITE 136
+#define IP_PROTO_TCP 6
 
 signed char input_cb(struct pbuf *p, struct netif *inp)
 {
-    ESP_LOGI(TAG, "bridge_cb");
-    sprintf("%s", p->payload);
+    const struct ip_hdr *iphdr;
+
+    iphdr = (struct ip_hdr *)p->payload;
+    switch (iphdr->_proto)
+    {
+    case IP_PROTO_ICMP:
+        ESP_LOGD(TAG, "Received ICMP Packet");
+        break;
+    case IP_PROTO_IGMP:
+        ESP_LOGD(TAG, "Received IGMP Packet");
+        break;
+    case IP_PROTO_UDP:
+        ESP_LOGD(TAG, "Received UDP Packet");
+        break;
+    case IP_PROTO_UDPLITE:
+        ESP_LOGD(TAG, "Received UDPLITE Packet");
+        break;
+    case IP_PROTO_TCP:
+        ESP_LOGD(TAG, "Received TCP Packet");
+        break;
+
+    default:
+        ESP_LOGE(TAG, "Received Packet with unknown type");
+        break;
+    }
+
+    printf("tot_len: %i\n", p->tot_len);
+    printf("payload: 0x%X\n", *(unsigned int *)p->payload);
     pbuf_free(p);
     return 1;
 }
