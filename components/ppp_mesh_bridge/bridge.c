@@ -17,7 +17,7 @@ static const char *TAG = "bridge";
 
 err_t input_cb(struct pbuf *p, struct netif *inp)
 {
-    if (!strcmp(inp->name, "p0") == 0)
+    if (strcmp(inp->name, "p0") != 0)
     {
         return ERR_IF;
     }
