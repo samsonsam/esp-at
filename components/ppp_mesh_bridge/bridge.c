@@ -5,6 +5,7 @@
 #include "esp_log.h"
 #include "lwip/netif.h"
 #include "lwip/ip4.h"
+#include "lwip/err.h"
 
 static const char *TAG = "bridge";
 
@@ -14,8 +15,12 @@ static const char *TAG = "bridge";
 #define IP_PROTO_UDPLITE 136
 #define IP_PROTO_TCP 6
 
-signed char input_cb(struct pbuf *p, struct netif *inp)
+err_t input_cb(struct pbuf *p, struct netif *inp)
 {
+    if (!strcmp(inp->name, "p0") == 0)
+    {
+        return ERR_IF;
+    }
     const struct ip_hdr *iphdr;
 
     iphdr = (struct ip_hdr *)p->payload;
@@ -45,7 +50,7 @@ signed char input_cb(struct pbuf *p, struct netif *inp)
     printf("tot_len: %i\n", p->tot_len);
     printf("payload: 0x%X\n", *(unsigned int *)p->payload);
     pbuf_free(p);
-    return 1;
+    return ERR_OK;
 }
 
 void test()

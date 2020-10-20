@@ -6,7 +6,7 @@
 
 
 
-signed char input_cb(struct pbuf *p, struct netif *inp);
+err_t input_cb(struct pbuf *p, struct netif *inp);
 
 void test();
 

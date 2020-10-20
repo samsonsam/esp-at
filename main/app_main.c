@@ -214,10 +214,11 @@ void app_main()
     uint8_t cmd_terminator[2] = {CONFIG_AT_COMMAND_TERMINATOR,0};
 #endif
 
-    nvs_flash_init();
-    // TCP/IP Adapter Migration see https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/tcpip_adapter_migration.html
+    ESP_ERROR_CHECK(nvs_flash_init());
+    /*  tcpip initialization */
     tcpip_adapter_init();
-    //esp_netif_init(); //called already in wifi_init();
+
+    mesh_init();
 #ifdef CONFIG_AT_WIFI_COMMAND_SUPPORT
     initialise_wifi();
 #endif

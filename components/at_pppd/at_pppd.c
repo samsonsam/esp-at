@@ -205,6 +205,7 @@ static void ppp_status_cb(ppp_pcb *pcb, int err_code, void *ctx)
 {
     ESP_LOGI(TAG, "ppp_status_cb");
     struct netif *pppif = ppp_netif(pcb);
+    pppif->name = "p0";
     LWIP_UNUSED_ARG(ctx);
 
     switch (err_code)
