@@ -35,6 +35,8 @@
 #include "at_pppd.h"
 #endif
 
+#include "mesh.h"
+
 #ifdef CONFIG_AT_WIFI_COMMAND_SUPPORT
 #include "esp_event_loop.h"
 #include "esp_wifi.h"

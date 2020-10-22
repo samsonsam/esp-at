@@ -205,7 +205,7 @@ static void ppp_status_cb(ppp_pcb *pcb, int err_code, void *ctx)
 {
     ESP_LOGI(TAG, "ppp_status_cb");
     struct netif *pppif = ppp_netif(pcb);
-    pppif->name = "p0";
+    strcpy(pppif->name, "p0");
     LWIP_UNUSED_ARG(ctx);
 
     switch (err_code)
@@ -223,8 +223,7 @@ static void ppp_status_cb(ppp_pcb *pcb, int err_code, void *ctx)
         ESP_LOGI(TAG, "   our6_ipaddr = %s\n", ip6addr_ntoa(netif_ip6_addr(pppif, 0)));
 #endif /* PPP_IPV6_SUPPORT */
 
-        pppif->input = *input_cb;
-        test();
+        //pppif->input = *bridge_input_cb;
         break;
     }
     case PPPERR_PARAM:
@@ -404,9 +403,8 @@ uint8_t at_exeCmdPpp(uint8_t *cmd_name)
     /**
  * Callback fn
  **/
-    //raw_recv(*ppp, raw_recv_fn_cb, (void *)0);
-    ppp->netif->input = *input_cb;
-    ppp_netif.input = *input_cb;
+    //ppp->netif->input = *bridge_input_cb;
+    //ppp_netif.input = *bridge_input_cb;
 
     while (keep_running)
     {
