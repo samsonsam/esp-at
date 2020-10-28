@@ -31,10 +31,6 @@
 #include "esp_system.h"
 #include "nvs_flash.h"
 
-#ifdef CONFIG_PPP_SUPPORT
-#include "at_pppd.h"
-#endif
-
 #include "mesh.h"
 
 #ifdef CONFIG_AT_WIFI_COMMAND_SUPPORT
@@ -242,26 +238,6 @@ void app_main()
         printf("regist base cmd fail\r\n");
     }
 #endif
-
-/**
- * Anfang
- **/
-
-#ifdef CONFIG_PPP_SUPPORT
-    if (esp_at_pppd_cmd_regist() == false)
-    {
-        printf("regist pppd cmd fail\r\n");
-    }
-    else
-    {
-        ESP_LOGI(TAG, "esp_at_pppd_cmd_regist success");    
-    }
-
-#endif
-
-/**
- * Ende
- **/
 
 #ifdef CONFIG_AT_WIFI_COMMAND_SUPPORT
     if(esp_at_wifi_cmd_regist() == false) {

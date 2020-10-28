@@ -14,6 +14,12 @@
 #include "esp_mesh.h"
 #include "esp_mesh_internal.h"
 #include "nvs_flash.h"
+#include "esp_log.h"
+#ifdef CONFIG_PPP_SUPPORT
+#include "at_pppd.h"
+#endif
+
+#include "bridge.h"
 
 /*******************************************************
  *                Macros
@@ -40,6 +46,8 @@ static bool is_running = true;
 static bool is_mesh_connected = false;
 static mesh_addr_t mesh_parent_addr;
 static int mesh_layer = -1;
+
+static const char *TAG = "mesh.c";
 
 /*******************************************************
  *                Function Declarations
@@ -154,6 +162,18 @@ void esp_mesh_p2p_rx_main(void *arg)
             ESP_LOGE(MESH_TAG, "err:0x%x, size:%d", err, data.size);
             continue;
         }
+        struct pbuf *q;
+        esp_err_t ret;
+        ret = create_pbuf_from_received_mesh_packet(q, &data);
+        if (esp_mesh_is_root())
+        {
+            ret = ip4_output_over_wifi(q);
+        } else
+        {
+            ret = ip4_output_over_ppp(q);
+        }
+        
+
         /* extract send count */
         if (data.size >= sizeof(send_count))
         {
@@ -337,6 +357,23 @@ void mesh_event_handler(void *arg, esp_event_base_t event_base,
     {
         mesh_event_toDS_state_t *toDs_state = (mesh_event_toDS_state_t *)event_data;
         ESP_LOGI(MESH_TAG, "<MESH_EVENT_TODS_REACHABLE>state:%d", *toDs_state);
+/**
+        * Anfang
+        **/
+#ifdef CONFIG_PPP_SUPPORT
+        if (esp_at_pppd_cmd_regist() == false)
+        {
+            printf("regist pppd cmd fail\r\n");
+        }
+        else
+        {
+            ESP_LOGI(TAG, "esp_at_pppd_cmd_regist success");
+        }
+
+#endif
+        /**
+        * Ende
+        **/
     }
     break;
     case MESH_EVENT_ROOT_FIXED:

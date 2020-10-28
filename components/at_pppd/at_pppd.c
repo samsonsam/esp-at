@@ -205,7 +205,10 @@ static void ppp_status_cb(ppp_pcb *pcb, int err_code, void *ctx)
 {
     ESP_LOGI(TAG, "ppp_status_cb");
     struct netif *pppif = ppp_netif(pcb);
-    strcpy(pppif->name, "p0");
+    pppif->name[0] = 'p';
+    pppif->name[1] = '0';
+    set_ppp_netif(pppif);
+
     LWIP_UNUSED_ARG(ctx);
 
     switch (err_code)
@@ -223,7 +226,7 @@ static void ppp_status_cb(ppp_pcb *pcb, int err_code, void *ctx)
         ESP_LOGI(TAG, "   our6_ipaddr = %s\n", ip6addr_ntoa(netif_ip6_addr(pppif, 0)));
 #endif /* PPP_IPV6_SUPPORT */
 
-        //pppif->input = *bridge_input_cb;
+
         break;
     }
     case PPPERR_PARAM:
@@ -254,6 +257,7 @@ static void ppp_status_cb(ppp_pcb *pcb, int err_code, void *ctx)
     case PPPERR_CONNECT:
     {
         ESP_LOGE(TAG, "status_cb: Connection lost\n");
+        delete_ppp_netif();
         break;
     }
     case PPPERR_AUTHFAIL:
@@ -367,10 +371,13 @@ uint8_t at_exeCmdPpp(uint8_t *cmd_name)
 
 #if PPP_SERVER
 #if PPP_IPV4_SUPPORT
-    pppd_config.addrs.netmask.addr = IPADDR_BROADCAST;
+    //pppd_config.addrs.netmask.addr = IPADDR_BROADCAST;
+    pppd_config.addrs.netmask.addr = ((u32_t)0xffffff00UL);
 #if LWIP_DNS
     pppd_config.addrs.dns1 = dns_getserver(1)->u_addr.ip4;
 #endif /* LWIP_DNS */
+
+    ppp_netif.netmask.u_addr.ip4.addr = ((u32_t)0xffffff00UL);
 
 #if LWIP_AUTOIP
     if (pppd_config.addrs.our_ipaddr.addr == IPADDR_ANY)
