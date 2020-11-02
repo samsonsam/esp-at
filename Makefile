@@ -12,6 +12,9 @@ export ESP_AT_PROJECT_PATH := $(PWD)
 EXTRA_COMPONENT_DIRS := $(ESP_AT_PROJECT_PATH)/tools/mkfatfs
 
 export IDF_PATH ?= $(ESP_AT_PROJECT_PATH)/esp-idf
+export MDF_PATH ?= $(ESP_AT_PROJECT_PATH)/esp-mdf
+
+include $(MDF_PATH)/project.mk
 
 export SILENCE ?=
 ifeq ($(SILENCE), 1)

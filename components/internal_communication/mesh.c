@@ -54,6 +54,9 @@ static const char *TAG = "mesh.c";
 static mesh_addr_t node_with_ppp_interface;
 static int8_t node_with_ppp_interface_is_set = 0;
 
+static mesh_addr_t *root_node;
+static int8_t root_node_is_set = 0;
+
 /*******************************************************
  *                Function Declarations
  *******************************************************/
@@ -157,8 +160,8 @@ esp_err_t esp_mesh_tx_to_child_ppp(struct pbuf *p)
     data.proto = MESH_PROTO_BIN;
     data.tos = MESH_TOS_P2P;
     if (node_with_ppp_interface_is_set == 0) return ESP_ERR_MESH_NO_ROUTE_FOUND;
-    ret = esp_mesh_send(addr, &data, MESH_DATA_P2P, NULL, 1);
-    ESP_LOGI(TAG, "Received pbuf on wifi: forwarded over esp-mesh -> error: %s", esp_err_to_name(ret));
+    ret = esp_mesh_send(addr, &data, MESH_DATA_P2P, NULL, 0);
+    ESP_LOGI(TAG, "esp_mesh_tx_to_child_ppp -> error: %s", esp_err_to_name(ret));
     if (ret != 0)
     {
         return ERR_VAL;
@@ -168,6 +171,9 @@ esp_err_t esp_mesh_tx_to_child_ppp(struct pbuf *p)
 
 esp_err_t esp_mesh_tx_to_root(struct pbuf *p)
 {
+    if (root_node_is_set == 0) return ESP_ERR_MESH_NO_ROUTE_FOUND;
+    
+    
     mesh_data_t data;
     esp_err_t ret;
     mesh_opt_t opt;
@@ -175,8 +181,9 @@ esp_err_t esp_mesh_tx_to_root(struct pbuf *p)
     data.size = RX_SIZE;
     data.proto = MESH_PROTO_BIN;
     data.tos = MESH_TOS_P2P;
-    ret = esp_mesh_send(NULL, &data, 0, NULL, 1);
-    ESP_LOGI(TAG, "Received pbuf on ppp: forwarded over esp-mesh -> error: %s", esp_err_to_name(ret));
+    ESP_LOGI(TAG, "sending packet to root with address:" MACSTR "", MAC2STR(root_node->addr));
+    ret = esp_mesh_send(NULL, &data, 0, NULL, 0);
+    ESP_LOGI(TAG, "esp_mesh_tx_to_root -> error: %s", esp_err_to_name(ret));
     if (ret != 0)
     {
         return ERR_VAL;
@@ -353,6 +360,8 @@ void mesh_event_handler(void *arg, esp_event_base_t event_base,
     case MESH_EVENT_ROOT_ADDRESS:
     {
         mesh_event_root_address_t *root_addr = (mesh_event_root_address_t *)event_data;
+        root_node = (mesh_addr_t *) root_addr;
+        root_node_is_set = 1;
         ESP_LOGI(MESH_TAG, "<MESH_EVENT_ROOT_ADDRESS>root address:" MACSTR "",
                  MAC2STR(root_addr->addr));
     }
