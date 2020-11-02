@@ -20,6 +20,8 @@
 #endif
 
 #include "bridge.h"
+#include "lwip/pbuf.h"
+#include "lwip/ip4.h"
 
 /*******************************************************
  *                Macros
@@ -48,6 +50,9 @@ static mesh_addr_t mesh_parent_addr;
 static int mesh_layer = -1;
 
 static const char *TAG = "mesh.c";
+
+static mesh_addr_t node_with_ppp_interface;
+static int8_t node_with_ppp_interface_is_set = 0;
 
 /*******************************************************
  *                Function Declarations
@@ -141,6 +146,44 @@ void esp_mesh_p2p_tx_main(void *arg)
     vTaskDelete(NULL);
 }
 
+esp_err_t esp_mesh_tx_to_child_ppp(struct pbuf *p)
+{
+    mesh_data_t data;
+    esp_err_t ret;
+    mesh_addr_t *addr;
+    addr = &node_with_ppp_interface;
+    data.data = p->payload;
+    data.size = RX_SIZE;
+    data.proto = MESH_PROTO_BIN;
+    data.tos = MESH_TOS_P2P;
+    if (node_with_ppp_interface_is_set == 0) return ESP_ERR_MESH_NO_ROUTE_FOUND;
+    ret = esp_mesh_send(addr, &data, MESH_DATA_P2P, NULL, 1);
+    ESP_LOGI(TAG, "Received pbuf on wifi: forwarded over esp-mesh -> error: %s", esp_err_to_name(ret));
+    if (ret != 0)
+    {
+        return ERR_VAL;
+    }
+    return ret;
+}
+
+esp_err_t esp_mesh_tx_to_root(struct pbuf *p)
+{
+    mesh_data_t data;
+    esp_err_t ret;
+    mesh_opt_t opt;
+    data.data = p->payload;
+    data.size = RX_SIZE;
+    data.proto = MESH_PROTO_BIN;
+    data.tos = MESH_TOS_P2P;
+    ret = esp_mesh_send(NULL, &data, 0, NULL, 1);
+    ESP_LOGI(TAG, "Received pbuf on ppp: forwarded over esp-mesh -> error: %s", esp_err_to_name(ret));
+    if (ret != 0)
+    {
+        return ERR_VAL;
+    }
+    return ret;
+}
+
 void esp_mesh_p2p_rx_main(void *arg)
 {
     int recv_count = 0;
@@ -162,35 +205,28 @@ void esp_mesh_p2p_rx_main(void *arg)
             ESP_LOGE(MESH_TAG, "err:0x%x, size:%d", err, data.size);
             continue;
         }
+        if (node_with_ppp_interface_is_set == 0)
+        {
+            //node_with_ppp_interface = &from;
+            node_with_ppp_interface = from;
+            node_with_ppp_interface_is_set = 1;
+        }
         struct pbuf *q;
         esp_err_t ret;
+        struct ip_hdr *iphdr = (struct ip_hdr *)data.data;
+        q = pbuf_alloc(PBUF_RAW, iphdr->_len, PBUF_REF);
         ret = create_pbuf_from_received_mesh_packet(q, &data);
         if (esp_mesh_is_root())
         {
             ret = ip4_output_over_wifi(q);
-        } else
+            ESP_LOGI(TAG, "Received pbuf over esp-mesh: forwarded over wifi");
+        }
+        else
         {
             ret = ip4_output_over_ppp(q);
+            ESP_LOGI(TAG, "Received pbuf over esp-mesh: forwarded over ppp");
         }
-        
-
-        /* extract send count */
-        if (data.size >= sizeof(send_count))
-        {
-            send_count = (data.data[25] << 24) | (data.data[24] << 16) | (data.data[23] << 8) | data.data[22];
-        }
-        recv_count++;
-        /* process light control */
-        //mesh_light_process(&from, data.data, data.size);
-        if (!(recv_count % 1))
-        {
-            ESP_LOGW(MESH_TAG,
-                     "[#RX:%d/%d][L:%d] parent:" MACSTR ", receive from " MACSTR ", size:%d, heap:%d, flag:%d[err:0x%x, proto:%d, tos:%d]",
-                     recv_count, send_count, mesh_layer,
-                     MAC2STR(mesh_parent_addr.addr), MAC2STR(from.addr),
-                     data.size, esp_get_free_heap_size(), flag, err, data.proto,
-                     data.tos);
-        }
+        pbuf_free(q);
     }
     vTaskDelete(NULL);
 }

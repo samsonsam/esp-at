@@ -5,13 +5,12 @@
 #include "lwip/netif.h"
 #include "lwip/ip.h"
 #include "lwip/ip4.h"
-#include "lwip/err.h"
 #include "esp_mesh.h"
 #include "lwip/ip4_frag.h"
 #include "lwip/ip4_addr.h"
 #include "lwip/ip_addr.h"
 #include "lwip/inet_chksum.h"
-#include "esp_mesh.h"
+#include "mesh.h"
 
 static const char *TAG = "bridge";
 
@@ -22,6 +21,18 @@ static struct netif *bridge_wifi_netif;
 static int8_t ppp_netif_set = 0;
 
 static int8_t wifi_netif_set = 0;
+
+void print_mesh_status()
+{
+    if (esp_mesh_is_root())
+    {
+        ESP_LOGI(TAG, "esp_mesh_is_root: true");
+    }
+    else
+    {
+        ESP_LOGI(TAG, "esp_mesh_is_root: false");
+    }
+}
 
 void set_ppp_netif(struct netif *ppp)
 {
@@ -92,10 +103,7 @@ int8_t is_wifi_netif(struct netif *inp)
 {
     if (wifi_netif_set == 1)
     {
-        if (strcmp(bridge_wifi_netif->name, inp->name) == 0)
-        {
-            return 0;
-        }
+        return strcmp(bridge_wifi_netif->name, inp->name);
     }
     return 1;
 }
@@ -104,21 +112,26 @@ int8_t is_ppp_netif(struct netif *inp)
 {
     if (ppp_netif_set == 1)
     {
-        if (strcmp(bridge_ppp_netif->name, inp->name) == 0)
-        {
-            return 0;
-        }
+        return strcmp(bridge_ppp_netif->name, inp->name);
     }
     return 1;
 }
 
 err_t ip4_output_over_wifi(struct pbuf *p)
 {
-    if (wifi_netif_set == 0)
-        return ERR_IF;
+    err_t ret;
+    print_mesh_status();
+
+    if (!esp_mesh_is_root())
+    {
+        ret = esp_mesh_tx_to_root(p);
+        if (ret == ERR_OK)
+            pbuf_free(p);
+        return ret;
+    }
 
     //struct pbuf *q;
-    err_t ret;
+
     //q = pbuf_alloc(PBUF_RAW_TX, p->len, PBUF_RAM);
     //q->l2_owner = NULL;
     //pbuf_copy(q, p);
@@ -128,7 +141,12 @@ err_t ip4_output_over_wifi(struct pbuf *p)
     // calculate the new checksum
     iphdr_rx->_chksum = inet_chksum(iphdr_rx, p->len);
     print_ip_hdr_info(iphdr_rx);
-    ret = ip4_output_if(p, &iphdr_rx->src, LWIP_IP_HDRINCL, iphdr_rx->_ttl, iphdr_rx->_tos, iphdr_rx->_proto, bridge_wifi_netif);
+
+    //u16_t iphdr_hlen;
+    //iphdr_hlen = IPH_HL_BYTES(iphdr_rx);
+    pbuf_remove_header(p, IPH_HL_BYTES(iphdr_rx));
+
+    ret = ip4_output(p, &iphdr_rx->src, &iphdr_rx->dest, iphdr_rx->_ttl, iphdr_rx->_tos, iphdr_rx->_proto);
     if (ret == ERR_OK)
         pbuf_free(p);
     print_err_t("ip4_output_over_wifi", ret);
@@ -137,11 +155,18 @@ err_t ip4_output_over_wifi(struct pbuf *p)
 
 err_t ip4_output_over_ppp(struct pbuf *p)
 {
+    err_t ret;
+    print_mesh_status();
+
     if (ppp_netif_set == 0)
-        return ERR_IF;
+    {
+        ret = esp_mesh_tx_to_child_ppp(p);
+        if (ret == ERR_OK)
+            pbuf_free(p);
+        return ret;
+    }
 
     struct pbuf *q;
-    err_t ret;
     //q = pbuf_alloc(PBUF_RAW_TX, p->len, PBUF_RAM);
     //q->l2_owner = NULL;
     //pbuf_copy(q, p);
@@ -163,7 +188,7 @@ err_t bridge_ip4_output(struct pbuf *rx, struct netif *inp)
     ESP_LOGI(TAG, "netif address: %s", ip4addr_ntoa(&inp->ip_addr));
     if (is_ppp_netif(inp) == 0)
     {
-        return ip4_output_over_wifi(rx);
+        ip4_output_over_wifi(rx);
     }
     else //if (is_wifi_netif(inp) == 0)
     {
@@ -328,8 +353,8 @@ err_t bridge_input_cb_ppp(struct pbuf *rx, struct netif *inp)
 
 void create_pbuf_from_received_mesh_packet(struct pbuf *p, mesh_data_t *data)
 {
-    if (data->proto != MESH_PROTO_BIN) return ESP_ERR_MESH_NOT_SUPPORT;
-    p = pbuf_alloc(PBUF_RAW_TX, data->size, PBUF_RAM);
+    if (data->proto != MESH_PROTO_BIN)
+        return ESP_ERR_MESH_NOT_SUPPORT;
     p->payload = data->data;
     p->l2_owner = NULL;
     return ESP_OK;
