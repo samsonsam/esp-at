@@ -214,7 +214,9 @@ void esp_mesh_p2p_rx_main(void *arg)
         esp_err_t ret;
         struct ip_hdr *iphdr = (struct ip_hdr *)data.data;
         q = pbuf_alloc(PBUF_RAW, iphdr->_len, PBUF_REF);
-        ret = create_pbuf_from_received_mesh_packet(q, &data);
+        q->payload = data.data;
+        q->l2_owner = NULL;
+
         if (esp_mesh_is_root())
         {
             ret = ip4_output_over_wifi(q);
