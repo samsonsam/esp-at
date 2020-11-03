@@ -35,6 +35,10 @@
 
 #include "mesh.h"
 
+#ifdef CONFIG_PPP_SUPPORT
+#include "at_pppd.h"
+#endif
+
 static const char *TAG = "main";
 
 void app_main()
@@ -84,6 +88,24 @@ void app_main()
     esp_at_module_init (CONFIG_AT_SOCKET_MAX_CONN_NUM, version);  // reserved one for server
     free(version);
     esp_at_factory_parameter_init();
+
+    /**
+        * Anfang
+        **/
+#ifdef CONFIG_PPP_SUPPORT
+        if (esp_at_pppd_cmd_regist() == false)
+        {
+            printf("regist pppd cmd fail\r\n");
+        }
+        else
+        {
+            ESP_LOGI(TAG, "esp_at_pppd_cmd_regist success");
+        }
+
+#endif
+        /**
+        * Ende
+        **/
 
 #ifdef CONFIG_AT_BASE_COMMAND_SUPPORT
     if(esp_at_base_cmd_regist() == false) {

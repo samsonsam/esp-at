@@ -15,9 +15,6 @@
 #include "esp_mesh_internal.h"
 #include "nvs_flash.h"
 #include "esp_log.h"
-#ifdef CONFIG_PPP_SUPPORT
-#include "at_pppd.h"
-#endif
 
 #include "bridge.h"
 #include "lwip/pbuf.h"
@@ -213,21 +210,23 @@ void esp_mesh_p2p_rx_main(void *arg)
         struct pbuf *q;
         esp_err_t ret;
         struct ip_hdr *iphdr = (struct ip_hdr *)data.data;
-        q = pbuf_alloc(PBUF_RAW, iphdr->_len, PBUF_REF);
+        //q = pbuf_alloc(PBUF_RAW, iphdr->_len, PBUF_RAM);
+        q = pbuf_alloc(PBUF_RAW, data.size, PBUF_RAM);
         q->payload = data.data;
         q->l2_owner = NULL;
 
         if (esp_mesh_is_root())
         {
+            ESP_LOGI(TAG, "Received pbuf with len: %d over esp-mesh: forwarding over wifi", data.size);
             ret = ip4_output_over_wifi(q);
-            ESP_LOGI(TAG, "Received pbuf over esp-mesh: forwarded over wifi");
         }
         else
         {
+            ESP_LOGI(TAG, "Received pbuf with len: %d over esp-mesh: forwarding over ppp", data.size);
             ret = ip4_output_over_ppp(q);
-            ESP_LOGI(TAG, "Received pbuf over esp-mesh: forwarded over ppp");
         }
         pbuf_free(q);
+        printf("\n");
     }
     vTaskDelete(NULL);
 }
@@ -394,23 +393,6 @@ void mesh_event_handler(void *arg, esp_event_base_t event_base,
     {
         mesh_event_toDS_state_t *toDs_state = (mesh_event_toDS_state_t *)event_data;
         ESP_LOGI(MESH_TAG, "<MESH_EVENT_TODS_REACHABLE>state:%d", *toDs_state);
-/**
-        * Anfang
-        **/
-#ifdef CONFIG_PPP_SUPPORT
-        if (esp_at_pppd_cmd_regist() == false)
-        {
-            printf("regist pppd cmd fail\r\n");
-        }
-        else
-        {
-            ESP_LOGI(TAG, "esp_at_pppd_cmd_regist success");
-        }
-
-#endif
-        /**
-        * Ende
-        **/
     }
     break;
     case MESH_EVENT_ROOT_FIXED:

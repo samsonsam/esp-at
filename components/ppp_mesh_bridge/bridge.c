@@ -119,6 +119,9 @@ int8_t is_ppp_netif(struct netif *inp)
 
 err_t ip4_output_over_wifi(struct pbuf *p)
 {
+    ESP_LOGI(TAG, "ip4_output_over_wifi");
+    struct ip_hdr *iphdr_rx = (struct ip_hdr *)p->payload;
+    print_ip_hdr_info(iphdr_rx);
     err_t ret;
     print_mesh_status();
 
@@ -130,17 +133,10 @@ err_t ip4_output_over_wifi(struct pbuf *p)
         return ret;
     }
 
-    //struct pbuf *q;
-
-    //q = pbuf_alloc(PBUF_RAW_TX, p->len, PBUF_RAM);
-    //q->l2_owner = NULL;
-    //pbuf_copy(q, p);
-    struct ip_hdr *iphdr_rx = (struct ip_hdr *)p->payload;
     // set the src addr of the tx packet to the wifi interfaces address
     iphdr_rx->src.addr = bridge_wifi_netif->ip_addr.u_addr.ip4.addr;
     // calculate the new checksum
     iphdr_rx->_chksum = inet_chksum(iphdr_rx, p->len);
-    print_ip_hdr_info(iphdr_rx);
 
     //u16_t iphdr_hlen;
     //iphdr_hlen = IPH_HL_BYTES(iphdr_rx);
@@ -155,7 +151,10 @@ err_t ip4_output_over_wifi(struct pbuf *p)
 
 err_t ip4_output_over_ppp(struct pbuf *p)
 {
+    ESP_LOGI(TAG, "ip4_output_over_ppp");
     err_t ret;
+    struct ip_hdr *iphdr_rx = (struct ip_hdr *)p->payload;
+    print_ip_hdr_info(iphdr_rx);
     print_mesh_status();
 
     if (ppp_netif_set == 0)
@@ -166,15 +165,9 @@ err_t ip4_output_over_ppp(struct pbuf *p)
         return ret;
     }
 
-    struct pbuf *q;
-    //q = pbuf_alloc(PBUF_RAW_TX, p->len, PBUF_RAM);
-    //q->l2_owner = NULL;
-    //pbuf_copy(q, p);
-    struct ip_hdr *iphdr_rx = (struct ip_hdr *)p->payload;
     iphdr_rx->dest.addr = bridge_ppp_netif->gw.u_addr.ip4.addr;
     // calculate the new checksum
     iphdr_rx->_chksum = inet_chksum(iphdr_rx, p->len);
-    print_ip_hdr_info(iphdr_rx);
     ret = ip4_output_if(p, &iphdr_rx->src, LWIP_IP_HDRINCL, iphdr_rx->_ttl, iphdr_rx->_tos, iphdr_rx->_proto, bridge_ppp_netif);
     if (ret == ERR_OK)
         pbuf_free(p);
@@ -190,7 +183,7 @@ err_t bridge_ip4_output(struct pbuf *rx, struct netif *inp)
     {
         ip4_output_over_wifi(rx);
     }
-    else //if (is_wifi_netif(inp) == 0)
+    else if (is_wifi_netif(inp) == 0)
     {
         return ip4_output_over_ppp(rx);
     }
@@ -200,6 +193,7 @@ err_t bridge_ip4_output(struct pbuf *rx, struct netif *inp)
     //     return ERR_IF;
     // }
 
+    printf("\n");
     return ERR_OK;
 }
 
