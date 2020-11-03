@@ -148,40 +148,39 @@ void esp_mesh_p2p_tx_main(void *arg)
 
 esp_err_t esp_mesh_tx_to_child_ppp(struct pbuf *p)
 {
+    esp_err_t err;
     mesh_data_t data;
-    esp_err_t ret;
-    mesh_addr_t *addr;
-    addr = &node_with_ppp_interface;
+    mesh_addr_t addr;
+
     data.data = p->payload;
-    data.size = RX_SIZE;
+    data.size = sizeof(tx_buf);
     data.proto = MESH_PROTO_BIN;
     data.tos = MESH_TOS_P2P;
+    addr = node_with_ppp_interface;
+
     if (node_with_ppp_interface_is_set == 0) return ESP_ERR_MESH_NO_ROUTE_FOUND;
-    ret = esp_mesh_send(addr, &data, MESH_DATA_P2P, NULL, 1);
-    ESP_LOGI(TAG, "Received pbuf on wifi: forwarded over esp-mesh -> error: %s", esp_err_to_name(ret));
-    if (ret != 0)
-    {
-        return ERR_VAL;
-    }
-    return ret;
+    err = esp_mesh_send(&addr, &data, MESH_DATA_P2P, NULL, 0);
+    ESP_LOGI(TAG, "Received pbuf on wifi: forwarded over esp-mesh -> error: %s", esp_err_to_name(err));
+    if (err != 0) return ERR_VAL;
+
+    return err;
 }
 
 esp_err_t esp_mesh_tx_to_root(struct pbuf *p)
 {
+    esp_err_t err;
     mesh_data_t data;
-    esp_err_t ret;
-    mesh_opt_t opt;
+
     data.data = p->payload;
-    data.size = RX_SIZE;
+    data.size = sizeof(tx_buf);
     data.proto = MESH_PROTO_BIN;
     data.tos = MESH_TOS_P2P;
-    ret = esp_mesh_send(NULL, &data, 0, NULL, 1);
-    ESP_LOGI(TAG, "Received pbuf on ppp: forwarded over esp-mesh -> error: %s", esp_err_to_name(ret));
-    if (ret != 0)
-    {
-        return ERR_VAL;
-    }
-    return ret;
+
+    err = esp_mesh_send(NULL, &data, MESH_DATA_P2P, NULL, 0);
+    ESP_LOGI(TAG, "Received pbuf on ppp: forwarded over esp-mesh -> error: %s", esp_err_to_name(err));
+    if (err != 0) return ERR_VAL;
+    
+    return err;
 }
 
 void esp_mesh_p2p_rx_main(void *arg)
