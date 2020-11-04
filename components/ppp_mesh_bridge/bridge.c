@@ -140,9 +140,10 @@ err_t ip4_output_over_wifi(struct pbuf *p)
 
     //u16_t iphdr_hlen;
     //iphdr_hlen = IPH_HL_BYTES(iphdr_rx);
-    pbuf_remove_header(p, IPH_HL_BYTES(iphdr_rx));
+    //pbuf_remove_header(p, IPH_HL_BYTES(iphdr_rx));
+    //ret = ip4_output(p, &iphdr_rx->src, &iphdr_rx->dest, iphdr_rx->_ttl, iphdr_rx->_tos, iphdr_rx->_proto);
 
-    ret = ip4_output(p, &iphdr_rx->src, &iphdr_rx->dest, iphdr_rx->_ttl, iphdr_rx->_tos, iphdr_rx->_proto);
+    ret = ip4_output_if(p, &iphdr_rx->src, LWIP_IP_HDRINCL, iphdr_rx->_ttl, iphdr_rx->_tos, iphdr_rx->_proto, bridge_wifi_netif);
     if (ret == ERR_OK)
         pbuf_free(p);
     print_err_t("ip4_output_over_wifi", ret);

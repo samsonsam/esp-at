@@ -167,9 +167,11 @@ esp_err_t esp_mesh_tx_to_root(struct pbuf *p)
 {
     esp_err_t err;
     mesh_data_t data;
+    struct ip_hdr *iphdr;
 
     data.data = p->payload;
-    data.size = sizeof(tx_buf);
+    //data.size = sizeof(tx_buf);
+    data.size = p->len;
     data.proto = MESH_PROTO_BIN;
     data.tos = MESH_TOS_P2P;
 
@@ -188,6 +190,7 @@ void esp_mesh_p2p_rx_main(void *arg)
     int send_count = 0;
     mesh_data_t data;
     int flag = 0;
+    // payload of pbuf
     data.data = rx_buf;
     data.size = RX_SIZE;
     is_running = true;
@@ -196,6 +199,7 @@ void esp_mesh_p2p_rx_main(void *arg)
     {
         data.size = RX_SIZE;
         err = esp_mesh_recv(&from, &data, portMAX_DELAY, &flag, NULL, 0);
+        ESP_LOGI(TAG, "Received pbuf with len: %d over esp-mesh", data.size);
         if (err != ESP_OK || !data.size)
         {
             ESP_LOGE(MESH_TAG, "err:0x%x, size:%d", err, data.size);
@@ -210,10 +214,12 @@ void esp_mesh_p2p_rx_main(void *arg)
         struct pbuf *q;
         esp_err_t ret;
         struct ip_hdr *iphdr = (struct ip_hdr *)data.data;
-        //q = pbuf_alloc(PBUF_RAW, iphdr->_len, PBUF_RAM);
-        q = pbuf_alloc(PBUF_RAW, data.size, PBUF_RAM);
-        q->payload = data.data;
+        q = pbuf_alloc(PBUF_IP, data.size, PBUF_RAM);
+        //q = pbuf_alloc(PBUF_IP, data.size, PBUF_RAM);
+        memcpy(q->payload, data.data, data.size);
         q->l2_owner = NULL;
+        q->ref = 1;
+        q->len = data.size;
 
         if (esp_mesh_is_root())
         {
@@ -225,7 +231,12 @@ void esp_mesh_p2p_rx_main(void *arg)
             ESP_LOGI(TAG, "Received pbuf with len: %d over esp-mesh: forwarding over ppp", data.size);
             ret = ip4_output_over_ppp(q);
         }
-        pbuf_free(q);
+
+        if (ret != 0)
+        {
+            pbuf_free(q);
+        }
+        
         printf("\n");
     }
     vTaskDelete(NULL);
