@@ -407,12 +407,6 @@ uint8_t at_exeCmdPpp(uint8_t *cmd_name)
 
     dbg_lwip_tcp_pcb_show();
 
-    /**
- * Callback fn
- **/
-    //ppp->netif->input = *bridge_input_cb;
-    //ppp_netif.input = *bridge_input_cb;
-
     while (keep_running)
     {
         memset(data, 0, BUF_SIZE);

@@ -7,6 +7,8 @@
    CONDITIONS OF ANY KIND, either express or implied.
 */
 #include <string.h>
+#include <stdbool.h>
+#include "mesh.h"
 #include "esp_wifi.h"
 #include "esp_system.h"
 #include "esp_event.h"
@@ -17,7 +19,6 @@
 #include "esp_log.h"
 
 #include "bridge.h"
-#include "lwip/pbuf.h"
 #include "lwip/ip4.h"
 
 /*******************************************************
@@ -49,98 +50,18 @@ static int mesh_layer = -1;
 static const char *TAG = "mesh.c";
 
 static mesh_addr_t node_with_ppp_interface;
-static int8_t node_with_ppp_interface_is_set = 0;
-
-/*******************************************************
- *                Function Declarations
- *******************************************************/
+static bool node_with_ppp_interface_is_set = false;
 
 /*******************************************************
  *                Function Definitions
  *******************************************************/
-void esp_mesh_p2p_tx_main(void *arg)
+
+void print_esp_err_t(char *fncn, esp_err_t err)
 {
-    int i;
-    esp_err_t err;
-    int send_count = 0;
-    mesh_addr_t route_table[CONFIG_MESH_ROUTE_TABLE_SIZE];
-    int route_table_size = 0;
-    mesh_data_t data;
-    data.data = tx_buf;
-    data.size = sizeof(tx_buf);
-    data.proto = MESH_PROTO_BIN;
-    data.tos = MESH_TOS_P2P;
-    is_running = true;
-
-    mesh_addr_t addr;
-    IP4_ADDR(&addr.mip.ip4, 192, 168, 178, 110);
-    addr.mip.port = 8089;
-
-    while (is_running)
+    if (err == ESP_OK)
     {
-        /* non-root do nothing but print */
-        if (!esp_mesh_is_root())
-        {
-            ESP_LOGI(MESH_TAG, "layer:%d, rtableSize:%d, %s", mesh_layer,
-                     esp_mesh_get_routing_table_size(),
-                     (is_mesh_connected && esp_mesh_is_root()) ? "ROOT" : is_mesh_connected ? "NODE" : "DISCONNECT");
-            vTaskDelay(10 * 1000 / portTICK_RATE_MS);
-            continue;
-        }
-        esp_mesh_get_routing_table((mesh_addr_t *)&route_table,
-                                   CONFIG_MESH_ROUTE_TABLE_SIZE * 6, &route_table_size);
-        if (send_count && !(send_count % 100))
-        {
-            ESP_LOGI(MESH_TAG, "size:%d/%d,send_count:%d", route_table_size,
-                     esp_mesh_get_routing_table_size(), send_count);
-        }
-        send_count++;
-        tx_buf[25] = (send_count >> 24) & 0xff;
-        tx_buf[24] = (send_count >> 16) & 0xff;
-        tx_buf[23] = (send_count >> 8) & 0xff;
-        tx_buf[22] = (send_count >> 0) & 0xff;
-        // if (send_count % 2) {
-        //     memcpy(tx_buf, (uint8_t *)&light_on, sizeof(light_on));
-        // } else {
-        //     memcpy(tx_buf, (uint8_t *)&light_off, sizeof(light_off));
-        // }
-
-        //data.proto = MESH_PROTO_BIN;
-        //ESP_ERROR_CHECK(esp_mesh_send(&addr, &data, MESH_DATA_TODS, NULL, 0));
-
-        //data.proto = MESH_PROTO_BIN;
-        //data.tos = MESH_TOS_P2P;
-
-        for (i = 0; i < route_table_size; i++)
-        {
-            //err = esp_mesh_send(&addr, &data, MESH_DATA_TODS, NULL, 0);
-            err = esp_mesh_send(&route_table[i], &data, MESH_DATA_P2P, NULL, 0);
-            if (err)
-            {
-                ESP_LOGE(MESH_TAG,
-                         "[ROOT-2-UNICAST:%d][L:%d]parent:" MACSTR " to " MACSTR ", heap:%d[err:0x%x, proto:%d, tos:%d]",
-                         send_count, mesh_layer, MAC2STR(mesh_parent_addr.addr),
-                         MAC2STR(route_table[i].addr), esp_get_free_heap_size(),
-                         err, data.proto, data.tos);
-            }
-            else if (!(send_count % 100))
-            {
-                ESP_LOGW(MESH_TAG,
-                         "[ROOT-2-UNICAST:%d][L:%d][rtableSize:%d]parent:" MACSTR " to " MACSTR ", heap:%d[err:0x%x, proto:%d, tos:%d]",
-                         send_count, mesh_layer,
-                         esp_mesh_get_routing_table_size(),
-                         MAC2STR(mesh_parent_addr.addr),
-                         MAC2STR(route_table[i].addr), esp_get_free_heap_size(),
-                         err, data.proto, data.tos);
-            }
-        }
-        /* if route_table_size is less than 10, add delay to avoid watchdog in this task. */
-        if (route_table_size < 10)
-        {
-            vTaskDelay(1 * 1000 / portTICK_RATE_MS);
-        }
+        ESP_LOGI(TAG, "%s: %s", fncn, esp_err_to_name(err));
     }
-    vTaskDelete(NULL);
 }
 
 esp_err_t esp_mesh_tx_to_child_ppp(struct pbuf *p)
@@ -148,18 +69,21 @@ esp_err_t esp_mesh_tx_to_child_ppp(struct pbuf *p)
     esp_err_t err;
     mesh_data_t data;
     mesh_addr_t addr;
+    struct ip_hdr *iph;
 
+    iph = (struct ip_hdr *)p->payload;
     data.data = p->payload;
-    data.size = sizeof(tx_buf);
+    data.size = IPH_LEN(iph);
     data.proto = MESH_PROTO_BIN;
     data.tos = MESH_TOS_P2P;
     addr = node_with_ppp_interface;
 
-    if (node_with_ppp_interface_is_set == 0) return ESP_ERR_MESH_NO_ROUTE_FOUND;
+    if (node_with_ppp_interface_is_set == false)
+        return ESP_ERR_MESH_NO_ROUTE_FOUND;
     err = esp_mesh_send(&addr, &data, MESH_DATA_P2P, NULL, 0);
     ESP_LOGI(TAG, "Received pbuf on wifi: forwarded over esp-mesh -> error: %s", esp_err_to_name(err));
-    if (err != 0) return ERR_VAL;
-
+    if (err != 0)
+        return ERR_VAL;
     return err;
 }
 
@@ -167,27 +91,24 @@ esp_err_t esp_mesh_tx_to_root(struct pbuf *p)
 {
     esp_err_t err;
     mesh_data_t data;
-    struct ip_hdr *iphdr;
+    struct ip_hdr *iph;
 
+    iph = (struct ip_hdr *)p->payload;
     data.data = p->payload;
-    //data.size = sizeof(tx_buf);
-    data.size = p->len;
+    data.size = IPH_LEN(iph); //p->len;
     data.proto = MESH_PROTO_BIN;
     data.tos = MESH_TOS_P2P;
-
     err = esp_mesh_send(NULL, &data, MESH_DATA_P2P, NULL, 0);
     ESP_LOGI(TAG, "Received pbuf on ppp: forwarded over esp-mesh -> error: %s", esp_err_to_name(err));
-    if (err != 0) return ERR_VAL;
-    
+    if (err != 0)
+        return ERR_VAL;
     return err;
 }
 
 void esp_mesh_p2p_rx_main(void *arg)
 {
-    int recv_count = 0;
     esp_err_t err;
     mesh_addr_t from;
-    int send_count = 0;
     mesh_data_t data;
     int flag = 0;
     // payload of pbuf
@@ -199,21 +120,15 @@ void esp_mesh_p2p_rx_main(void *arg)
     {
         data.size = RX_SIZE;
         err = esp_mesh_recv(&from, &data, portMAX_DELAY, &flag, NULL, 0);
-        ESP_LOGI(TAG, "Received pbuf with len: %d over esp-mesh", data.size);
         if (err != ESP_OK || !data.size)
         {
             ESP_LOGE(MESH_TAG, "err:0x%x, size:%d", err, data.size);
             continue;
         }
-        if (node_with_ppp_interface_is_set == 0)
-        {
-            //node_with_ppp_interface = &from;
-            node_with_ppp_interface = from;
-            node_with_ppp_interface_is_set = 1;
-        }
+
         struct pbuf *q;
         esp_err_t ret;
-        struct ip_hdr *iphdr = (struct ip_hdr *)data.data;
+        //struct ip_hdr *iphdr = (struct ip_hdr *)data.data;
         q = pbuf_alloc(PBUF_IP, data.size, PBUF_RAM);
         //q = pbuf_alloc(PBUF_IP, data.size, PBUF_RAM);
         memcpy(q->payload, data.data, data.size);
@@ -225,6 +140,11 @@ void esp_mesh_p2p_rx_main(void *arg)
         {
             ESP_LOGI(TAG, "Received pbuf with len: %d over esp-mesh: forwarding over wifi", data.size);
             ret = ip4_output_over_wifi(q);
+            if (node_with_ppp_interface_is_set == false)
+            {
+                node_with_ppp_interface = from;
+                node_with_ppp_interface_is_set = true;
+            }
         }
         else
         {
@@ -236,7 +156,7 @@ void esp_mesh_p2p_rx_main(void *arg)
         {
             pbuf_free(q);
         }
-        
+
         printf("\n");
     }
     vTaskDelete(NULL);
@@ -248,7 +168,6 @@ esp_err_t esp_mesh_comm_p2p_start(void)
     if (!is_comm_p2p_started)
     {
         is_comm_p2p_started = true;
-        //xTaskCreate(esp_mesh_p2p_tx_main, "MPTX", 3072, NULL, 5, NULL);
         xTaskCreate(esp_mesh_p2p_rx_main, "MPRX", 3072, NULL, 5, NULL);
     }
     return ESP_OK;
